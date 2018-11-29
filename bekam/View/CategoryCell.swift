@@ -12,6 +12,7 @@ class CategoryCell: UICollectionViewCell {
     
     //model
     var category:String! {
+        
         didSet{
             categoryLabel.text = category
             categoryLabel.sizeToFit()

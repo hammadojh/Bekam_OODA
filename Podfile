@@ -8,6 +8,7 @@ target 'bekam' do
   pod 'Firebase/Database'
   pod 'Firebase/Auth'
   pod 'Firebase/Storage'
+  pod 'GoogleSignIn'
 	
   # Pods for bekam
 

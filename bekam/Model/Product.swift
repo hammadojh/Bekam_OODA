@@ -8,17 +8,35 @@
 
 import Foundation
 
-class Product {
+
+
+/// Product Class
+/// used to hold products
+
+public class Product {
     
+    /// Id of the product
+    var id:String?
+    /// Id of the user that posted the product
+    var userId:String?
+    /// name of the product. Might be empty
     var name:String?
-    var imageName:String?
+    /// price of the product
     var price:Double?
+    /// city that the product is located in
     var city:String?
+    /// urls for the different images of the product
     var imagesURLS:[String?]?
+    /// date product was added
     var addedDate : Date?
+    /// weather it is available or not
     var available : Bool?
+    /// different categories of the product
     var categories : [String?]?
+    /// the description of the product
     var description: String?
+    
+    /// Default initializer
     
     public init() {
         name = ""
@@ -30,6 +48,31 @@ class Product {
         categories = []
         description = ""
     }
+    
+    
+    
+    /// Copy initializer from another product
+    ///
+    /// - Parameter from: the other product that you want to copy from
+    
+    public init(from:Product){
+       
+        name = from.name
+        price = from.price
+        city = from.city
+        imagesURLS = from.imagesURLS
+        addedDate = from.addedDate
+        available = from.available
+        categories = from.categories
+        description = from.name
+        userId = from.userId
+        id = from.id
+        
+    }
+    
+    /// Initializer from a dictionary object. It maps the fields of the dictionary to the properties of the object if they are found
+    ///
+    /// - Parameter dict: the dictionary that you want to copy from
     
     public init( dict:[String:Any] ){
         
@@ -43,6 +86,14 @@ class Product {
         
         if let price = dict["price"] as? Double {
             self.price = price
+
+        } else if let price = dict["price"] as? String {
+            
+            if let parsedPrice = Double(price) {
+                self.price = parsedPrice
+            }else{
+                self.price = 0
+            }
             
         }
         
@@ -59,21 +110,24 @@ class Product {
             self.imagesURLS = imgsURLs
         }
         
+        if let uid = dict["userid"] as? String {
+            self.userId = uid
+        }
+        
+        if let id = dict["id"] as? String {
+            self.id = id
+        }
+        
         
     }
     
-    private func calculateDistance() -> Double {
-        //TODO: Complete
-        return 10
-    }
-    
-    private func getImagesURLs() -> [String]{
-        //TODO: Complete
-        return ["kalifa"]
-    }
-    
+    /// Sets the date using a string formatted date
+    ///
+    /// - Parameter dateString: The formatted date string.
     private func setDate(dateString:String){
         self.addedDate = Date.createDateFromString(stringDate: dateString)
     }
+    
+    
 
 }

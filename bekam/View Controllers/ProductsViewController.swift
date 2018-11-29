@@ -8,13 +8,13 @@
 
 import UIKit
 
-class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UICollectionViewDelegate, UICollectionViewDataSource,LiquidLayoutDelegate {
+class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UICollectionViewDelegate, UICollectionViewDataSource,LiquidLayoutDelegate, ProductCellObserver {
 
+    
     //model
     var products:[Product] = []
+    var selectedIndex:Int?
     
-    let images = ["home","note","car","phone"]
-
     // ui
     @IBOutlet weak var collectionView: UICollectionView!
     
@@ -35,10 +35,12 @@ class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UIColle
         // collectionView
         
         let layout = LiquidCollectionViewLayout()
-        layout.delegate = self
-        
+        layout.delegate = self        
         collectionView.collectionViewLayout = layout
         collectionView.delegate = self
+        
+        collectionView.register(UINib(nibName: "ProductCell", bundle: nil), forCellWithReuseIdentifier: "productCell")
+
         
         //setups
         setupNav()
@@ -46,7 +48,15 @@ class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UIColle
         //load products
         loadProducts()
         
+        //show login
+        showLogin()
         
+        
+    }
+    
+    func showLogin(){
+        let screen = self.storyboard?.instantiateViewController(withIdentifier: "LoginViewController") as! LoginViewController
+        self.present(screen, animated: false, completion: nil)
     }
 
     
@@ -63,9 +73,8 @@ class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UIColle
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "productCell", for: indexPath) as! ProductCell
         
         let product = products[indexPath.item]
-        product.imageName = images[indexPath.item % images.count]
-        
         cell.product = product
+        cell.observer = self
         
         return cell
         
@@ -83,6 +92,54 @@ class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UIColle
         return heights[ indexPath.item % 3]
         
     }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        
+        let id = "productDetailsController"
+        let storyBoard: UIStoryboard = UIStoryboard(name: "Main", bundle: nil)
+        let nextVC = storyBoard.instantiateViewController(withIdentifier: id) as! ProductDetailsController
+
+        if (products[indexPath.item].userId == firUser?.uid ) {
+            nextVC.state = MyProductDetailsState(viewController: nextVC)
+            registerDismissObserver()
+        }else {
+            nextVC.state = OtherProductDetailsState(viewController: nextVC)
+        }
+        
+        selectedIndex = indexPath.item
+        nextVC.product = products[indexPath.item]
+        
+        let selectedCell = collectionView.cellForItem(at: indexPath) as! ProductCell
+        if let image =  selectedCell.image.image {
+            nextVC.bgImage = image
+        }
+        
+        let nav = UINavigationController(rootViewController: nextVC)
+        nav.isNavigationBarHidden = false
+        
+        self.present(nav, animated: true, completion: nil)
+        
+    }
+    
+    func registerDismissObserver(){
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(detialsDismissed),
+            name: Notification.Name.detailsDismissed,
+            object: nil
+        )
+        
+    }
+    
+    @objc func detialsDismissed(_ notification:Notification){
+        
+        guard let newProduct = notification.object as? Product else { print("no object from notif"); return }
+        guard let index = selectedIndex else { return }
+        products[index] = newProduct
+        self.collectionView.reloadData()
+        
+    }
 
 
     
@@ -95,7 +152,7 @@ class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UIColle
         navigationController?.navigationBar.barTintColor = .white
         
         //left button
-        navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(named: "filter_icn")?.withRenderingMode(.alwaysOriginal), style: .plain, target: self, action: #selector(navItemClicked))
+        navigationItem.rightBarButtonItem = UIBarButtonItem(image: UIImage(named: "filter_icn")?.withRenderingMode(.alwaysOriginal), style: .plain, target: self, action: #selector(navItemClicked))
         
         //right button
         let cityButton = UIButton(frame: CGRect(x: 0, y: 0, width: 70, height: 28))
@@ -113,7 +170,7 @@ class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UIColle
         cityButton.addTarget(self, action: #selector(cityButtonClicked), for: .touchUpInside)
         
         // add the button
-        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: cityButton)
+        navigationItem.leftBarButtonItem = UIBarButtonItem(customView: cityButton)
         
         
     }
@@ -171,16 +228,18 @@ class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UIColle
         
         ApiServices.getInstance().loadProducts{ (snapshot, error) in
             
-            if(error == nil){
-                
-                if let dict = snapshot!.value as? [String:Any]{
-                    let product = Product(dict: dict)
-                    self.products.append(product)
-                    self.collectionView.reloadData()
-                }
-                
-            }else{
+            if(error != nil){
                 print(error!.localizedDescription)
+                return
+            }
+            
+            if let dict = snapshot!.value as? [String:Any]{
+                
+                let product = Product(dict: dict)
+                product.id = snapshot?.key
+                self.products.insert(product, at: 0)
+                self.collectionView.reloadData()
+                
             }
             
         }
@@ -189,13 +248,22 @@ class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UIColle
     
     //////////////////// NAV //////////////////////
     
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+    func notfiy(product: Product) {
         
-        let nextVC = segue.destination as! ProductDetailsController
-        let cell = sender as! ProductCell
-        nextVC.product = cell.product
+        guard checkLogin(self,goBack: false) else{
+            return
+        }
+        
+        let secondViewController = self.storyboard?.instantiateViewController(withIdentifier: "ChatViewController") as! ChatViewController
+        
+        secondViewController.chatSession = ChatSession(id: "", ownerId: firUser?.uid ?? "", productId: product.id ?? "")
+        
+        secondViewController.product = product
+        navigationController?.pushViewController(secondViewController, animated: true)
         
     }
+    
+   
     
 }
 
@@ -203,35 +271,16 @@ class ProductsViewController: BaseUIViewController, UISearchBarDelegate, UIColle
 // OTHER VIEW CONTROLLERS
 
 class NotificationsViewController:BaseUIViewController{
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-    }
-}
-
-
-class ImageViewController:BaseUIViewController{
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-    }
-}
-
-
-class ChatViewController:BaseUIViewController{
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-    }
-}
-
-
-class ProfileViewController:BaseUIViewController{
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        // check loging
+        checkLogin(self)
+        
+    }
     
 }
